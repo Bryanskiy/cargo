@@ -968,7 +968,7 @@ fn panic_abort_no_std_build() {
 
 #[cargo_test(build_std_mock)]
 fn panic_not_set_build_std() {
-    // No panic strategy + build std = build `panic_unwind` as a default
+    // No panic strategy + build std = build both `panic_unwind` and `panic_abort` as a default
     let setup = setup();
 
     let p = project()
@@ -991,8 +991,110 @@ fn panic_not_set_build_std() {
     p.cargo("check")
         .build_std(&setup)
         .target_host()
-        .with_stderr_contains("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
         .with_stderr_contains("[COMPILING] panic_abort v0.1.0 ([..]/library/panic_abort)")
+        .with_stderr_contains("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
+        .with_status(0)
+        .run();
+}
+
+#[cargo_test(build_std_mock)]
+fn panic_unwind_build_std() {
+    // Unwinding panic strategy + build std = build both `panic_unwind` and `panic_abort`
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+
+            [profile.dev]
+            panic = 'unwind'
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("check")
+        .build_std(&setup)
+        .target_host()
+        .with_stderr_contains("[COMPILING] panic_abort v0.1.0 ([..]/library/panic_abort)")
+        .with_stderr_contains("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
+        .with_status(0)
+        .run();
+}
+
+#[cargo_test(build_std_mock)]
+fn panic_abort_build_std() {
+    // Abort panic strategy + build std = build `panic_abort` only
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+
+            [profile.dev]
+            panic = 'abort'
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("check")
+        .build_std(&setup)
+        .target_host()
+        .with_stderr_contains("[COMPILING] panic_abort v0.1.0 ([..]/library/panic_abort)")
+        .with_stderr_does_not_contain("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
+        .with_status(0)
+        .run();
+}
+
+#[cargo_test(build_std_mock)]
+fn immediate_abort_build_std() {
+    // Immediate abort panic strategy + build std = build `panic_abort` only
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+
+            [profile.dev]
+            panic = 'immediate-abort'
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("check")
+        .build_std(&setup)
+        .target_host()
+        .with_stderr_contains("[COMPILING] panic_abort v0.1.0 ([..]/library/panic_abort)")
+        .with_stderr_does_not_contain("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
         .with_status(0)
         .run();
 }
