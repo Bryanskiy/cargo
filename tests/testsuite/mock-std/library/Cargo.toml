@@ -1,6 +1,6 @@
 [workspace]
 resolver = "1"
-members = [
+members = ["panic_abort",
   "std",
   "sysroot",
 ]

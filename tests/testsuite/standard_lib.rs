@@ -890,3 +890,109 @@ fn std_build_script_metadata_propagate_to_user() {
 
     p.cargo("check").build_std(&setup).target_host().run();
 }
+
+#[cargo_test(build_std_mock)]
+fn panic_unwind_no_std_build() {
+    // Unwinding panic strategy + not building std = rustc throw an error
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+
+            [profile.dev]
+            panic = 'unwind'
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        #![no_std]
+
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("build")
+        .build_std_arg(&setup, "core")
+        .target_host()
+        .with_stderr_contains("[ERROR] unwinding panics are not supported without std")
+        .with_stderr_does_not_contain("[..]libstd[..]")
+        .with_status(101)
+        .run();
+}
+
+#[cargo_test(build_std_mock)]
+fn panic_abort_no_std_build() {
+    // Abort panic strategy + not building std = Ok
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+
+            [profile.dev]
+            panic = 'abort'
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        #![no_std]
+
+        #[panic_handler]
+        fn panic(_info: &core::panic::PanicInfo) -> ! {
+            loop {}
+        }
+
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("check")
+        .build_std_arg(&setup, "core")
+        .target_host()
+        .with_status(0)
+        .run();
+}
+
+#[cargo_test(build_std_mock)]
+fn panic_not_set_build_std() {
+    // No panic strategy + build std = build `panic_unwind` as a default
+    let setup = setup();
+
+    let p = project()
+        .file(
+            "Cargo.toml",
+            r#"
+            [package]
+            name = "foo"
+            edition = "2024"
+        "#,
+        )
+        .file(
+            "src/main.rs",
+            r#"
+        fn main() {}
+        "#,
+        )
+        .build();
+
+    p.cargo("check")
+        .build_std(&setup)
+        .target_host()
+        .with_stderr_contains("[COMPILING] panic_unwind v0.1.0 ([..]/library/panic_unwind)")
+        .with_stderr_contains("[COMPILING] panic_abort v0.1.0 ([..]/library/panic_abort)")
+        .with_status(0)
+        .run();
+}
