@@ -9,7 +9,7 @@ std = { path = "../std" }
 test = { path = "../test" }
 
 [features]
-default = ["panic-unwind"]
+default = []
 panic-unwind = ["std/panic-unwind"]
 backtrace = []
 feature1 = ["std/feature1"]

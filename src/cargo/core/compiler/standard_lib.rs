@@ -3,7 +3,7 @@
 use crate::core::compiler::UnitInterner;
 use crate::core::compiler::unit_dependencies::IsArtifact;
 use crate::core::compiler::{CompileKind, CompileMode, RustcTargetData, Unit};
-use crate::core::profiles::{Profiles, UnitFor};
+use crate::core::profiles::{PanicStrategy, Profiles, UnitFor};
 use crate::core::resolver::HasDevUnits;
 use crate::core::resolver::features::{CliFeatures, FeaturesFor, ResolvedFeatures};
 use crate::core::{PackageId, PackageSet, Resolve, Workspace};
@@ -26,7 +26,6 @@ fn std_crates<'a>(crates: &'a [String], default: &'static str, units: &[Unit]) -
         crates.insert("core");
         crates.insert("alloc");
         crates.insert("proc_macro");
-        crates.insert("panic_unwind");
         crates.insert("compiler_builtins");
         // Only build libtest if it looks like it is needed (libtest depends on libstd)
         // If we know what units we're building, we can filter for libtest depending on the jobs.
@@ -50,6 +49,7 @@ pub fn resolve_std<'gctx>(
     ws: &Workspace<'gctx>,
     target_data: &mut RustcTargetData<'gctx>,
     build_config: &BuildConfig,
+    profiles: &Profiles,
     crates: &[String],
     kinds: &[CompileKind],
 ) -> CargoResult<(PackageSet<'gctx>, Resolve, ResolvedFeatures)> {
@@ -63,9 +63,9 @@ pub fn resolve_std<'gctx>(
     // `[dev-dependencies]`. No need for us to generate a `Resolve` which has
     // those included because we'll never use them anyway.
     std_ws.set_require_optional_deps(false);
-    let specs = {
+    let (specs, build_std) = {
         // If there is anything looks like needing std, resolve with it.
-        // If not, we assume only `core` maye be needed, as `core the most fundamental crate.
+        // If not, we assume only `core` may be needed, as `core` the most fundamental crate.
         //
         // This may need a UI overhaul if `build-std` wants to fully support multi-targets.
         let maybe_std = kinds
@@ -75,17 +75,25 @@ pub fn resolve_std<'gctx>(
         // `sysroot` is not in the default set because it is optional, but it needs
         // to be part of the resolve in case we do need it or `libtest`.
         crates.insert("sysroot");
+        let build_std = crates.contains("std");
         let specs = Packages::Packages(crates.into_iter().map(Into::into).collect());
-        specs.to_package_id_specs(&std_ws)?
+        (specs.to_package_id_specs(&std_ws)?, build_std)
     };
-    let features = match &gctx.cli_unstable().build_std_features {
+    let mut features = match &gctx.cli_unstable().build_std_features {
         Some(list) => list.clone(),
-        None => vec![
-            "panic-unwind".to_string(),
-            "backtrace".to_string(),
-            "default".to_string(),
-        ],
+        None => vec!["backtrace".to_string(), "default".to_string()],
     };
+
+    // NOTE: Base profile is enough here since `panic` profile cannot
+    // be overridden. See `validate_profile_override`.
+    let profile = profiles.base_profile();
+    if profile.panic == PanicStrategy::Unwind && build_std
+        // Also add `panic-unwind` feature if `panic_unwind` crate was requested by user.
+        || crates.iter().any(|c| c == "panic_unwind")
+    {
+        features.push("panic-unwind".to_string());
+    }
+
     let cli_features = CliFeatures::from_command_line(
         &features, /*all_features*/ false, /*uses_default_features*/ false,
     )?;

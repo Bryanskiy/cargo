@@ -2,6 +2,7 @@ use crate::core::compiler::BuildConfig;
 use crate::core::compiler::RustcTargetData;
 use crate::core::compiler::UserIntent;
 use crate::core::compiler::standard_lib;
+use crate::core::profiles::Profiles;
 use crate::core::{PackageSet, Resolve, Workspace};
 use crate::ops;
 use crate::util::CargoResult;
@@ -70,10 +71,12 @@ pub fn fetch<'a>(
 
     // If -Zbuild-std was passed, download dependencies for the standard library.
     if let Some(crates) = &gctx.cli_unstable().build_std {
+        let profiles = Profiles::new(ws, build_config.requested_profile)?;
         let (std_package_set, _, _) = standard_lib::resolve_std(
             ws,
             &mut data,
             &build_config,
+            &profiles,
             crates,
             &build_config.requested_kinds,
         )?;
