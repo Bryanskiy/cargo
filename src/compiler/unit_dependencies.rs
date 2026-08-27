@@ -669,7 +669,8 @@ fn compute_deps_doc(
             IS_NO_ARTIFACT_DEP,
         )?;
         ret.push(lib_unit_dep);
-        if dep_lib.documented() && state.intent.wants_deps_docs() {
+        // Note(build-std=always): generate documentation only for top-level crates.
+        if dep_lib.documented() && state.intent.wants_deps_docs() && !unit.is_std {
             // Document this lib as well.
             let doc_unit_dep = new_unit_dep(
                 state,

@@ -493,6 +493,7 @@ pub fn create_bcx<'a, 'gctx>(
                 std_resolve,
                 std_features,
                 &explicit_host_kinds,
+                build_config.intent,
                 &pkg_set,
                 interner,
                 &profiles,
