@@ -1101,6 +1101,21 @@ fn panic_abort_test() {
 [COMPILING] panic_abort [..]
 [COMPILING] panic_unwind [..]
 [WARNING] Cargo.toml: `panic` setting is ignored for `test` profile
+[ERROR] the crate `std` requires panic strategy `abort` which is incompatible with this crate's strategy of `unwind`
+...
+"#]]
+            .unordered(),
+        )
+        .with_status(101)
+        .run();
+
+    p.cargo("check --test hello")
+        .build_std_arg(&setup, "std")
+        .target_host()
+        .with_stderr_data(
+            str![[r#"
+[COMPILING] panic_abort [..]
+[COMPILING] panic_unwind [..]
 ...
 "#]]
             .unordered(),
@@ -1135,10 +1150,12 @@ fn panic_abort_bench() {
 [COMPILING] panic_abort [..]
 [COMPILING] panic_unwind [..]
 [WARNING] Cargo.toml: `panic` setting is ignored for `bench` profile
+[ERROR] the crate `std` requires panic strategy `abort` which is incompatible with this crate's strategy of `unwind`
 ...
 "#]]
             .unordered(),
         )
+        .with_status(101)
         .run();
 }
 
